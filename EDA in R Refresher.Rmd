@@ -1,0 +1,167 @@
+---
+title: "Experimenting with EDA Techniques"
+author: "Logan Cones"
+date: "June 1, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Introduction
+We are going to take a look at a couple Kaggle Datasets as a refresher of EDA techniques in R.  
+```{r}
+setwd('C:\\Users\\Logan Cones\\Desktop\\2019\\R Book\\')
+df <- read.csv('cereal.csv')
+head(df)
+```
+
+# Exploratory Data Analysis
+Many different types of metrics to get the middle location or descripitive statistics
+
+* Simple Mean
+* Trimmed Mean helps with outliers and is different than the median
+* Tried and True Center value or Median
+
+```{r}
+#Simple Mean
+mean(df$calories)
+
+#Trimmed Mean
+mean(df$calories, trim=.1)
+
+#Median
+median(df$calories)
+
+#This is similiar to describe() in python gives you a lot of descriptive statistics
+#summary(df)
+```
+
+```{r message = FALSE, warning=FALSE}
+#could also experiment with a weighted mean
+library(matrixStats)
+library(dplyr)
+weighted.mean(df$calories, w = df$protein)
+weightedMedian(df$calories, w = df$protein)
+```
+##Variability 
+You also want to be concerned with the variability in the data
+* Variance is the sum of squared deviations from the mean divided by n - 1 
+* Standard deviation is the square root of the variance
+* IQR 25th percentile and 75th percentile
+
+```{r}
+sd(df$calories)
+IQR(df$calories)
+#Mean Absolute Deviation from the Median
+mad(df$calories)
+```
+
+
+### Why do we use Degrees of Freedom?
+It's all about wanting to make estimates about a population and not based on a sample
+Essnetially if you divide by n you will underestimate the true value of the variance and the standard
+deviation of the population.  This is referred to as a biased estimate N-1 results in unbiased estimate.  
+
+##Exploring the Distrubutions
+Easy Techniques for doing this
+
+* Frequency Table
+* Boxplot (my personal fav)
+* Density Plot
+* Histogram
+
+```{r}
+quantile(df$calories, p=c(.01, .05, .25, .5, .75, .95, .99))
+boxplot(df$calories, ylab = "Cereal Calories")
+```
+Frequency Tables are actually pretty cool
+```{r}
+breaks <- seq(from= min(df$calories),
+              to = max(df$calories), length = 5)
+pop_freq <- cut(df$calories, breaks = breaks, right = TRUE, include.lowest = TRUE)
+table(pop_freq)
+```
+Histogram
+```{r}
+hist(df$calories, breaks = breaks)
+```
+
+Density Plots
+
+* Skewness refers to whether the data is skewed to larger or smaller values
+* Kurtosis indicates the propensity of the data to have extreme values 
+
+```{r}
+hist(df$calories, freq =  FALSE, main = 'Calories Distribution')
+lines(density(df$calories), lwd = 3, col = 'orange')
+```
+
+###Exploring Categorical Data
+* Use a bar chart which is different than a histogram because a histogram represents values of a single variable on a numeric scale and a bar chart represents different categories of a factor variable
+
+###Correlation
+* High correlation means that if high values of X go with high values of Y and low values of x go with low values of Y, it is vice versa then it is negatively corrleated
+
+####Key Terms
+* Correlation Coefficient: A metric that measures the extent to which the numeric vairables are assoicated with one another 1 or -1 is perfect and often a problem in modeling
+** If relationship not linear this is pretty useless
+* Correlation Matrix: A table where the variables are shown on both rows and columns and the values are the correlations between the variables.  Super super helpful techniques if limited features
+* Scatterplot: A plot in which the x-axis is the value of one variable and the y-axis is the value of another
+
+
+#### Correlation in Action
+Make a new dataframe of all numeric variables and we what the correlations are 
+
+Somewhat surprising more calories is negatively correlated with higher ratings!  Must have surveys some mature adults :)
+```{r message = FALSE, warning = FALSE}
+library(corrplot)
+library(dplyr)
+nums <-  select_if(df, is.numeric)
+corrplot(cor(nums), method = 'ellipse')
+```
+The above graph is based on Pearson's Correlation which is based purely on value and is not robust to outliers.  Other Correlations such as Spearman's Rho and Kendall's Tau use Rank of the data.  This could be useful in certain situtations.  
+
+###Scatterplot
+Let's take another look at the Rating and Carolies combo
+```{r warning = FALSE, message=FALSE}
+library(ggplot2)
+ggplot(data = df, aes(x = calories, y = rating, color=mfr), xlab = 'Calories', ylab = 'Rating') + ggtitle('Sugary and Gross?') + geom_point() + geom_smooth(method=lm, se = FALSE)
+```
+
+##Exploring Two or More Variables
+Key Terms
+
+* Contingency Tables: A tally of counts between two or more categorical variables
+* Hexagonal Binning: A plot of two numeric tables with records binned into hexagons
+* Contour Plots: A plot showing the density of two numeric variables like topographical mapping
+* Violin Plots Similar to a boxplor but showing the density estimate.  These are beautiful in the python package seaborn.
+
+I'm going to load in a new dataset to do these tests with for the Cereal data is too small. 
+
+##Diamond Dataset
+I recently got engaged to my now fiance so we will take a look at the diamond dataset to learn more about these techniques.  This was pulled from everyone's favorite site Kaggle 
+
+```{r}
+df2 <- read.csv('diamonds.csv')
+head(df2)
+```
+```{r message = FALSE, warning = FALSE}
+#let's get rid of the crazy people that have more than 2.5 Carats cause that's insane
+df2 <- subset(df2, carat < 2.5)
+
+ggplot(df2, (aes(x=carat, y = price)))+ ggtitle('Carats and Pricing' ) + stat_bin_hex(colour= 'gray') + theme_bw() + scale_fill_gradient(low='white', high = 'black') + labs(x="Carat", y = 'Price')
+```
+
+Not sure this next technique is going to be super useful here but it's an interesting approach to exploration as is.  Take two categorical variables and make a contingency table of them
+
+```{r warning = FALSE, message=FALSE}
+library(descr)
+CrossTable(df2$clarity, df2$cut, prop.c = FALSE, prop.chisq=FALSE, prop.t = FALSE)
+```
+Then of course my favorite and the one that seems most useful in my current role is box plots of cateogrical variables.  Let's make some Violin plots with clarity and price.  Even though I just bought a ring I didn't dive this deep into the process. WISH I DID THIS BEFORE HAND!  Doesn't really seem like splitting it up by cut moves the needle as much as I would have thought.
+```{r}
+ggplot(df2, aes(clarity, price, color= clarity)) + geom_violin() + labs(x = 'Clarity', y = 'Cost') + facet_wrap('cut') + ggtitle('Clairty vs Price by Cut')
+```
+
